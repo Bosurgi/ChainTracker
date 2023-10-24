@@ -62,7 +62,7 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
 
 
-@bot.command
+@bot.command()
 async def start_watching(ctx):
     wrath = get(ctx.guidl.roles, name='Wrath')
     global check_task
@@ -73,7 +73,7 @@ async def start_watching(ctx):
         await ctx.send("Chain watch already running!")
 
 
-@bot.command
+@bot.command()
 async def stop_watching(ctx):
     global check_task
     if check_task:
