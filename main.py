@@ -1,4 +1,6 @@
+import tracker
+import os
 
+# Running the bot
 if __name__ == '__main__':
-    # Running the bot
-    pass
+    tracker.bot.run(os.environ["DISCORD_TOKEN"])
