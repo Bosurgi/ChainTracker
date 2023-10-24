@@ -64,10 +64,9 @@ async def on_ready():
 
 @bot.command()
 async def start_watching(ctx):
-    wrath = get(ctx.guidl.roles, name='Wrath')
     global check_task
     if check_task is None:
-        check_task = check_timer.start()
+        check_task = check_timer.start(ctx)
         await ctx.send("Chain watch started!")
     else:
         await ctx.send("Chain watch already running!")
