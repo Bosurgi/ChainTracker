@@ -46,6 +46,8 @@ async def check_timer(ctx):
         elif timeout == 0:
             role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
             await ctx.send(f'{role.mention} - Chain ended!')
+            # Ending the task
+            check_timer.stop()
 
     except ValueError:
         print(f'No {ROLE_NAME} found')
