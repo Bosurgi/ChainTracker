@@ -64,7 +64,7 @@ async def on_ready():
 
 @bot.command()
 async def start_watching(ctx):
-    wrath = get(ctx.guidl.roles, name='Wrath')
+    wrath = get(ctx.guild.roles, name='Wrath')
     global check_task
     if check_task is None:
         check_task = check_timer.start()
