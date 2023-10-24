@@ -77,6 +77,7 @@ async def stop_watching(ctx):
     global check_task
     if check_task:
         check_timer.stop()
+        check_task = None
         await ctx.send("Watching stopped.")
     else:
         ctx.send("Watching not running.")
