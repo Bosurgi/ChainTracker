@@ -33,28 +33,22 @@ def parse_data(url_request):
 # Task running every 30 seconds to check if the timeout is less than 2 minutes
 @tasks.loop(seconds=30)
 async def check_timer(ctx):
+    global role
     chain_data = parse_data(requests.get(API_CALL))
     timeout = chain_data['chain']['timeout']
-
     try:
-
-        if timeout <= 120:
-
-            role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
-            await ctx.send(f'{role.mention} - Chain ending in 2 minutes!')
-
-        elif timeout == 0:
-            role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
-            await ctx.send(f'{role.mention} - Chain ended!')
-            # Ending the task
-            check_timer.stop()
-
+        role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
     except ValueError:
         print(f'No {ROLE_NAME} found')
 
+    if timeout == 0:
+        await ctx.send(f'{role.mention} - Chain ended!')
+        check_timer.stop()
+        await stop_watching(ctx)
 
-# It checks if the chain timeout is expiring
-# Returns true if timer is close to expire
+    elif timeout <= 120:
+        role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
+        await ctx.send(f'{role.mention} - Chain ending in {timeout} seconds!')
 
 
 @bot.event
@@ -80,4 +74,4 @@ async def stop_watching(ctx):
         check_task = None
         await ctx.send("Watching stopped.")
     else:
-        ctx.send("Watching not running.")
+        await ctx.send("Watching not running.")
