@@ -2,8 +2,7 @@
 
 import os
 import discord
-from discord.ext import commands, tasks
-import json
+from discord.ext import commands
 from dotenv import load_dotenv
 import time
 import requests
@@ -17,89 +16,74 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 API_CALL = os.getenv('API_CALL')
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 ROLE_NAME = 'Wrath'
 ATTACKS = 'current'
 CHAIN = 'chain'
 TIMEOUT = 'timeout'
-check_task = None
-timeout = 0
 
-channel_id = 0
+timeout = 180
 message_id = 0
 
 countdown_embed = discord.Embed(title='Chain Watcher', description=f'Time left: ')
 
 
-def getTime(api_url):
+async def getTime(api_url):
+    """It gets the timeout of the current chain using an API key provided"""
     chain_data = requests.get(api_url).json()
     return chain_data[CHAIN][TIMEOUT]
 
 
-async def updateTimer():
+async def checkTimer(ctx, remaining_time):
+    while remaining_time > 0:
+        try:
+            role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
+
+            if remaining_time < 180:
+                converted = time.strftime('%M:%S', time.gmtime(remaining_time))
+                await ctx.send(f'{role.mention} - Chain ending in {converted}')
+
+            await asyncio.sleep(1)
+            remaining_time -= 1
+
+        except ValueError:
+            print(f'No {ROLE_NAME} found')
+
+    await ctx.send(f'{role.mention} - Chain ended')
+
+
+async def updateTimer(ctx, id_message):
     global timeout
     counter = 0
-    countdown_seconds = getTime(API_CALL)
-    while True:
-        # Converting seconds to minutes and seconds remaining
-        countdown_minutes = countdown_seconds // 60
-        countdown_seconds_remaining = countdown_seconds % 60
-        # Updating the embed description with new time
-        countdown_embed.description = f'Time left: {countdown_minutes}:{countdown_seconds_remaining}'
+    # TODO: Reactivate this after testing
+    # timeout = getTime(API_CALL)
 
-        message = await bot.get_channel(1065701444486967297).fetch_message(message_id)
+    while timeout > 0:
+        # Converting seconds to minutes and seconds remaining
+        countdown_minutes = timeout // 60
+        countdown_seconds_remaining = timeout % 60
+        countdown_embed.description = f'Time left: {countdown_minutes:02}:{countdown_seconds_remaining:02}'
+
+        message = await bot.get_channel(CHANNEL_ID).fetch_message(id_message)
         await message.edit(embed=countdown_embed)
 
         # Wait one second and updating the seconds timer
         await asyncio.sleep(1)
-        countdown_seconds -= 1
-        countdown_seconds_remaining -= 1
+        # countdown_seconds -= 1
+        timeout -= 1
+        # countdown_seconds_remaining -= 1
         counter += 1
 
-        if countdown_seconds == 0 and countdown_minutes > 0:
-            countdown_minutes -= 1
-            countdown_seconds = 59
-
-        # After 30 seconds update the timeout making an API Call
+    # After 30 seconds update the timeout making an API Call
         if counter >= 30:
-            countdown_seconds = getTime(API_CALL)
-            # Updating global variable
-            timeout = countdown_seconds
+            # TODO: Reactivate this after testing offline
+            # countdown_seconds = getTime(API_CALL)
+
             # Resetting the counter
             counter = 0
 
-        if countdown_seconds == 0 and countdown_minutes == 0:
-            break
-
-
-"""
-# Task running every 30 seconds to check if the timeout is less than 2 minutes
-@tasks.loop(seconds=20)
-async def check_timer(ctx):
-    global role
-    global callTime
-    chain_data = requests.get(API_CALL)
-    timeout = chain_data['chain']['timeout']
-    converted = str(time.strftime('%M:%S', time.gmtime(timeout)))
-
-    try:
-        role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
-    except ValueError:
-        print(f'No {ROLE_NAME} found')
-
-    if timeout == 0:
-        await ctx.send(f'{role.mention} - Chain ended!')
-        check_timer.stop()
-        await stop_watching(ctx)
-
-    elif timeout <= 150:
-        role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
-
-        await ctx.send(f'{role.mention} - Chain ending in {converted}')
-
-    else:
-        print(f'Time remaining: {converted}')
-
-"""
+    # Notify when timer reaches 0
+    await ctx.send("Chain ended!")
 
 
 @bot.event
@@ -112,50 +96,14 @@ async def watch(ctx):
     global timeout
     global message_id
     print("Watch started")
-    try:
-        role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
 
-        message = await ctx.send(embed=countdown_embed)
-        message_id = message.id
-        await updateTimer()
+    message = await ctx.send(embed=countdown_embed)
+    message_id = message.id
 
-        if timeout < 0:
-            await ctx.send(f'{role.mention} - Chain ended')
-
-        elif timeout < 180:
-            converted = str(time.strftime('%M:%S', time.gmtime(timeout)))
-            await ctx.send(f'{role.mention} - Chain ending in {converted}')
-
-
-    except ValueError:
-        print(f'No {ROLE_NAME} found')
+    await asyncio.gather(updateTimer(ctx, message_id), checkTimer(ctx, timeout))
 
 
 @bot.command()
 async def stop(ctx):
+    # TODO: Implement a way to stop the Bot
     print("Watch stopped")
-
-
-"""
-@bot.command()
-async def start_watching(ctx):
-    global check_task
-    if check_task is None:
-        check_task = check_timer.start(ctx)
-        await ctx.send("Chain watch started!")
-    else:
-        await ctx.send("Chain watch already running!")
-"""
-
-"""
-@bot.command()
-async def stop_watching(ctx):
-    global check_task
-    if check_task:
-        check_timer.stop()
-        check_task = None
-        await ctx.send("Watching stopped.")
-    else:
-        await ctx.send("Watching not running.")
-        
-"""
