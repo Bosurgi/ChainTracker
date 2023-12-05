@@ -22,8 +22,13 @@ ATTACKS = 'current'
 CHAIN = 'chain'
 TIMEOUT = 'timeout'
 
-timeout = 180
+timeout = 2
 message_id = 0
+
+# Cooldown for sending messages of 30 seconds
+message_cooldown = 30
+
+last_update_time = 0
 
 countdown_embed = discord.Embed(title='Chain Watcher', description=f'Time left: ')
 
@@ -34,17 +39,35 @@ async def getTime(api_url):
     return chain_data[CHAIN][TIMEOUT]
 
 
-async def checkTimer(ctx, remaining_time):
-    while remaining_time > 0:
+async def cooldown_send(ctx, message, cooldown):
+    global last_update_time
+    current_time = time.time()
+    if current_time - last_update_time >= cooldown:
+        await ctx.send(message)
+        last_update_time = current_time
+
+
+async def checkTimer(ctx):
+    counter = 30
+
+    time_remaining = await getTime(API_CALL)
+    while time_remaining > 0:
+
         try:
             role = discord.utils.get(ctx.guild.roles, name=ROLE_NAME)
 
-            if remaining_time < 180:
-                converted = time.strftime('%M:%S', time.gmtime(remaining_time))
-                await ctx.send(f'{role.mention} - Chain ending in {converted}')
+            if counter == 0:
+                time_remaining = await getTime(API_CALL)
+                counter = 30
 
-            await asyncio.sleep(1)
-            remaining_time -= 1
+            if time_remaining < 180:
+                converted = time.strftime('%M:%S', time.gmtime(time_remaining))
+                await cooldown_send(ctx, f'{role.mention} - Chain ending in {converted}', 20)
+
+            await asyncio.sleep(1.5)
+            time_remaining -= 1
+            counter -= 1
+            print(time.strftime('%M:%S', time.gmtime(time_remaining)))
 
         except ValueError:
             print(f'No {ROLE_NAME} found')
@@ -56,7 +79,7 @@ async def updateTimer(ctx, id_message):
     global timeout
     counter = 0
     # TODO: Reactivate this after testing
-    # timeout = getTime(API_CALL)
+    timeout = await getTime(API_CALL)
 
     while timeout > 0:
         # Converting seconds to minutes and seconds remaining
@@ -74,16 +97,16 @@ async def updateTimer(ctx, id_message):
         # countdown_seconds_remaining -= 1
         counter += 1
 
-    # After 30 seconds update the timeout making an API Call
+        # After 30 seconds update the timeout making an API Call
         if counter >= 30:
             # TODO: Reactivate this after testing offline
-            # countdown_seconds = getTime(API_CALL)
+            timeout = await getTime(API_CALL)
 
             # Resetting the counter
             counter = 0
 
     # Notify when timer reaches 0
-    await ctx.send("Chain ended!")
+    await cooldown_send(ctx, "Chain Ended!", 10)
 
 
 @bot.event
@@ -96,14 +119,15 @@ async def watch(ctx):
     global timeout
     global message_id
     print("Watch started")
+    timeout = await getTime(API_CALL)
 
     message = await ctx.send(embed=countdown_embed)
     message_id = message.id
 
-    await asyncio.gather(updateTimer(ctx, message_id), checkTimer(ctx, timeout))
+    await asyncio.gather(updateTimer(ctx, message_id), checkTimer(ctx))
 
 
 @bot.command()
 async def stop(ctx):
-    # TODO: Implement a way to stop the Bot
+    bot.loop.stop()
     print("Watch stopped")
