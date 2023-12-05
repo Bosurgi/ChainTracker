@@ -32,6 +32,9 @@ last_update_time = 0
 
 countdown_embed = discord.Embed(title='Chain Watcher', description=f'Time left: ')
 
+# Shared lock between threads
+lock = asyncio.Lock()
+
 
 async def getTime(api_url):
     """It gets the timeout of the current chain using an API key provided"""
@@ -50,7 +53,9 @@ async def cooldown_send(ctx, message, cooldown):
 async def checkTimer(ctx):
     counter = 30
 
-    time_remaining = await getTime(API_CALL)
+    async with lock:
+        time_remaining = await getTime(API_CALL)
+
     while time_remaining > 0:
 
         try:
@@ -78,8 +83,8 @@ async def checkTimer(ctx):
 async def updateTimer(ctx, id_message):
     global timeout
     counter = 0
-    # TODO: Reactivate this after testing
-    timeout = await getTime(API_CALL)
+    async with lock:
+        timeout = await getTime(API_CALL)
 
     while timeout > 0:
         # Converting seconds to minutes and seconds remaining
@@ -88,7 +93,9 @@ async def updateTimer(ctx, id_message):
         countdown_embed.description = f'Time left: {countdown_minutes:02}:{countdown_seconds_remaining:02}'
 
         message = await bot.get_channel(CHANNEL_ID).fetch_message(id_message)
-        await message.edit(embed=countdown_embed)
+
+        async with lock:
+            await message.edit(embed=countdown_embed)
 
         # Wait one second and updating the seconds timer
         await asyncio.sleep(1)
@@ -99,14 +106,15 @@ async def updateTimer(ctx, id_message):
 
         # After 30 seconds update the timeout making an API Call
         if counter >= 30:
-            # TODO: Reactivate this after testing offline
-            timeout = await getTime(API_CALL)
+            async with lock:
+                timeout = await getTime(API_CALL)
 
             # Resetting the counter
             counter = 0
 
     # Notify when timer reaches 0
-    await cooldown_send(ctx, "Chain Ended!", 10)
+    async with lock:
+        await cooldown_send(ctx, "Chain Ended!", 10)
 
 
 @bot.event
